@@ -91,13 +91,11 @@ public class ApiHelpInventory {
 			
 			@Override
 			public boolean isScanAllResources() {
-				// TODO Auto-generated method stub
 				return true;
 			}
 			
 			@Override
 			public Collection<String> getIgnoredRoutes() {
-				// TODO Auto-generated method stub
 				return null;
 			}
 		};
@@ -119,12 +117,10 @@ public class ApiHelpInventory {
 	/**
 	 * Get a list of all top level resources
 	 */
-	public Set<Class<?>> getRootResources() {	
-
-		if(controllerClasses.isEmpty()){			
-			getControllerClasses();			
-		} 
-
+	public Set<Class<?>> getRootResources() {
+		
+		controllerClasses.clear();				
+		getControllerClasses();					 
 		return controllerClasses;
 
 	}
