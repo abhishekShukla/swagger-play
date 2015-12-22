@@ -1,13 +1,18 @@
 package plugins;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import javax.ws.rs.Path;
+import javax.ws.rs.core.Response;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +20,13 @@ import com.mysql.fabric.xmlrpc.base.Array;
 
 import io.swagger.*;
 import io.swagger.annotations.Api;
+import io.swagger.jaxrs.Reader;
+import io.swagger.jaxrs.config.BeanConfig;
+import io.swagger.jaxrs.config.DefaultReaderConfig;
+import io.swagger.jaxrs.config.ReaderConfig;
+import io.swagger.jaxrs.listing.SwaggerSerializers;
 import io.swagger.models.Swagger;
+import io.swagger.util.Json;
 import play.*;
 import play.classloading.ApplicationClasses.ApplicationClass;
 import play.mvc.Router;
@@ -35,19 +46,12 @@ public class ApiHelpInventory {
 			Play.configuration.getProperty("api.version", "beta");
 
 	private static final String basePath = 
-			Play.configuration.getProperty("swagger.api.basepath", "http://localhost");
+			Play.configuration.getProperty("swagger.api.basepath", "http://localhost/");
 
 	private static final String apiFilterClassName = 
 			Play.configuration.getProperty("swagger.security.filter");
 
-	private SwaggerContext swaggerContext = SwaggerContext.
-			getInstance().registerClassLoader(Play.classloader);
-
-	private Map<String, Class> resourceMap = new HashMap<>();
-
-	private List<Class> controllerClasses = new ArrayList<>();
-
-	private boolean filterOutTopLevelApi = true;
+	private Set<Class<?>> controllerClasses = new HashSet<>();
 
 	private static ApiHelpInventory apiHelpInventory = new ApiHelpInventory();
 
@@ -60,38 +64,18 @@ public class ApiHelpInventory {
 		return apiHelpInventory;
 	}
 
-	private List<Class> getControllerClasses(){
+	private Set<Class<?>> getControllerClasses(){
 
-		if(controllerClasses.isEmpty()) {
+		controllerClasses.clear();
 
-			List<ApplicationClass> allClasses = Play.classes.all();
+		List<ApplicationClass> allClasses = Play.classes.all();
 
-			for (ApplicationClass clazz : allClasses) {
-				if (clazz.name.startsWith("controllers.")) {
-					if (clazz.javaClass != null && !clazz.javaClass.isInterface() 
-							&& !clazz.javaClass.isAnnotation()) {
+		for (ApplicationClass clazz : allClasses) {
 
-						controllerClasses.add(clazz.javaClass); 
-
-					}
+			if (clazz.name.startsWith("controllers.")) {
+				if (isRessource(clazz.javaClass)) {
+					controllerClasses.add(clazz.javaClass); 
 				}
-			}
-
-			if(!controllerClasses.isEmpty()) {
-
-				for (Class clazz : controllerClasses) {
-
-					Api apiAnnotation = (Api) clazz.getAnnotation(Api.class);
-
-					if (apiAnnotation != null) {
-						Logger.debug("Identified Resource " + 
-								clazz.toString() + " :: " + 
-								apiAnnotation.value());
-
-						resourceMap.put(apiAnnotation.value(), clazz); 
-					}
-				}
-
 			}
 		}
 
@@ -99,102 +83,83 @@ public class ApiHelpInventory {
 
 	}
 
-	public List<String> getResourceNames(){
-
-		List<String> resourceNames = new ArrayList<>();
-		Map<String, Class> resourceMap = getResourceMap();
-
-		for(String key : resourceMap.keySet()){
-			resourceNames.add(key);
-		}
-
-		return resourceNames;
-
-	}
-	public String getRootHelpJson(String apiPath){
-
-		Swagger swagger = getRootResources("json");		
-
-		if(swagger != null){
-			ObjectMapper jacksonObjectMapper = new ObjectMapper();
-			try {
-				
-				return jacksonObjectMapper.writeValueAsString(swagger);
-			} catch (JsonProcessingException e) {
-				e.printStackTrace();
-				return "";
+	public String getRootHelpJson(){
+		
+		SwaggerSerializers.setPrettyPrint(true);
+		Swagger swagger = new Swagger();			
+		ReaderConfig readerConfig = new ReaderConfig() {
+			
+			@Override
+			public boolean isScanAllResources() {
+				// TODO Auto-generated method stub
+				return true;
 			}
+			
+			@Override
+			public Collection<String> getIgnoredRoutes() {
+				// TODO Auto-generated method stub
+				return null;
+			}
+		};
+		
+		PlayReader reader = new PlayReader(swagger, readerConfig);
+		swagger = reader.read(controllerClasses);
+			   
+		ObjectMapper commonMapper = Json.mapper();
+		
+		try {
+			return commonMapper.writeValueAsString(swagger);
+		} catch (JsonProcessingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return "";
 		}
-		return "";		
 	}
 
 	/**
 	 * Get a list of all top level resources
 	 */
-	private Swagger getRootResources(String format) {	
-
-		PlayReader playReader = new PlayReader(null);
-
-		Set<Class<?>> classes = new HashSet<>();
-
-		for(String string : resourceMap.keySet()){
-			classes.add(resourceMap.get(string));
-		}
-
-		Swagger swagger = playReader.read(classes);
-		return swagger;
-
-	}
-
-	/**
-	 * Get detailed API/models for a given resource
-	 */
-	private Swagger getResource(String resourceName){
-
-		Swagger swagger = null;
-
-		Class clazz = getResourceMap().get(resourceName);
-
-		if(clazz != null){
-
-			Api apiAnnotation = (Api) clazz.getAnnotation(Api.class);
-
-			String currentApiPath = null;
-
-			if(apiAnnotation != null && filterOutTopLevelApi){
-				currentApiPath = apiAnnotation.value();
-			}
-
-			swagger = PlayApiReader.read(clazz);			
-
-		}			
-
-		return swagger;
-
-	}
-
-	public String getPathHelpJson(String path){
-
-		Swagger swagger = getResource(path);
-		if(swagger != null){
-			ObjectMapper jacksonObjectMapper = new ObjectMapper();
-			try {
-				return jacksonObjectMapper.writeValueAsString(swagger);
-			} catch (JsonProcessingException e) {
-				e.printStackTrace();
-				return "";
-			}
-		}
-		return "";
-	}
-
-	public Map<String, Class> getResourceMap(){
+	public Set<Class<?>> getRootResources() {	
 
 		if(controllerClasses.isEmpty()){			
 			getControllerClasses();			
 		} 
 
-		return resourceMap;
+		return controllerClasses;
+
+	}
+
+
+	private boolean isRessource(Class<?> javaClass) {
+		// ignore interfaces and abstract classes
+		if (javaClass.isInterface()
+				|| Modifier.isAbstract(javaClass.getModifiers()))
+			return false;
+
+		// check for @Path or @Provider annotation
+		if (hasAnnotation(javaClass, Path.class))
+			return true;
+
+		return false;
+	}
+
+	private boolean hasAnnotation(Class<?> type, Class<? extends Annotation> annotation) {
+		// null cannot have annotations
+		if (type == null)
+			return false;
+
+		// class annotation
+		if (type.isAnnotationPresent(annotation))
+			return true;
+
+		// annotation on interface
+		for (Class<?> interfaceType : type.getInterfaces()) {
+			if (hasAnnotation(interfaceType, annotation))
+				return true;
+		}
+
+		// annotation on superclass
+		return hasAnnotation(type.getSuperclass(), annotation);
 
 	}
 

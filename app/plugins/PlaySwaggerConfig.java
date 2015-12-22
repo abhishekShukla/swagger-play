@@ -1,6 +1,5 @@
 package plugins;
 
-
 public class PlaySwaggerConfig {
 
     String[] schemes;

@@ -12,6 +12,7 @@ import play.mvc.Router;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * This plugin adds two new entries to play route table for swagger help api.<br/>
@@ -35,24 +36,19 @@ public class SwaggerPlugin  extends PlayPlugin {
     	Logger.info("Got request for " + request.path);
 
         try {
-            final List<String> resourceNames = 
-            		ApiHelpInventory.getInstance().getResourceNames();
+            final Set<Class<?>> resourceClasses = 
+            		ApiHelpInventory.getInstance().getRootResources();
             
-            for (String resourceName : resourceNames) {
-            	System.out.println(resourceName);
-                if (request.path.equals(resourceName + JSON)) {
+            if(resourceClasses.size() > 0){
+            	            	            	
+                if (request.path.equals(RESOURCES_JSON)) {
                     response.contentType = APPLICATION_JSON;
-                    String apiHelp = ApiHelpInventory.getInstance().getPathHelpJson(resourceName);
-                    response.out.write(apiHelp.getBytes(UTF_8));
-                    return true;                
-                } else if (request.path.equals(RESOURCES_JSON)) {
-                    response.contentType = APPLICATION_JSON;
-                    String apiHelp = ApiHelpInventory.getInstance().getRootHelpJson(resourceName);
-                    
-                    response.out.write(apiHelp.getBytes(UTF_8));
+                    String jaxRsResponseJson = ApiHelpInventory.getInstance().getRootHelpJson();                    
+                    response.out.write(jaxRsResponseJson.getBytes(UTF_8));
                     return true;
                 } 
             }
+
         } catch (Exception e) {
             Logger.error(e, "Error in SwaggerPlugin");
         }
@@ -64,26 +60,13 @@ public class SwaggerPlugin  extends PlayPlugin {
     @Override
     public void onApplicationStart() {
     	
-        final List<String> resourceNames = ApiHelpInventory.getInstance().getResourceNames();
-        
-        Map<String, Route> router = new HashMap<>();
-           
-        for(Route route : Router.routes){ 	
-        	router.put(route.action, route);
-        }
-        
-        RouteWrapper routeWrapper = new RouteWrapper(router);
-        RouteFactory.setRoute(routeWrapper);
-        		
-        if (resourceNames.size() > 0) {
+    	final Set<Class<?>> resourceClasses = 
+        		ApiHelpInventory.getInstance().getRootResources();
+                
+        if (resourceClasses.size() > 0) {
             
             Router.prependRoute("GET", RESOURCES_JSON, "ApiHelpController.catchAll");
             Logger.info("Swagger: Added ROOT help api @ " + RESOURCES_JSON);
-            
-            for (String resourceName : resourceNames) {
-                Router.prependRoute("GET", resourceName + ".json", "ApiHelpController.catchAll");                
-                Logger.info("Swagger: Added help api @ " + resourceName + ".json");                
-            }
         }
     }
 
