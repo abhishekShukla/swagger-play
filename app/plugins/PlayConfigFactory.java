@@ -4,8 +4,8 @@ public class PlayConfigFactory {
 
     private static PlaySwaggerConfig instance;
 
-    public static void setConfig(PlaySwaggerConfig routes) {
-        instance = routes;
+    public static void setConfig(PlaySwaggerConfig playSwaggerConfig) {
+        instance = playSwaggerConfig;
     }
 
     public static PlaySwaggerConfig getConfig() {

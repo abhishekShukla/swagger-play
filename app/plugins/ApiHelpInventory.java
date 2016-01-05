@@ -25,6 +25,9 @@ import io.swagger.jaxrs.config.BeanConfig;
 import io.swagger.jaxrs.config.DefaultReaderConfig;
 import io.swagger.jaxrs.config.ReaderConfig;
 import io.swagger.jaxrs.listing.SwaggerSerializers;
+import io.swagger.models.Contact;
+import io.swagger.models.Info;
+import io.swagger.models.License;
 import io.swagger.models.Swagger;
 import io.swagger.util.Json;
 import play.*;
@@ -40,17 +43,7 @@ import play.mvc.Router.Route;
  *
  */
 public class ApiHelpInventory {
-
-	// Read various configurable properties. These can be specified in application.conf
-	private static final String API_VERSION = 
-			Play.configuration.getProperty("api.version", "beta");
-
-	private static final String basePath = 
-			Play.configuration.getProperty("swagger.api.basepath", "http://localhost/");
-
-	private static final String apiFilterClassName = 
-			Play.configuration.getProperty("swagger.security.filter");
-
+			
 	private Set<Class<?>> controllerClasses = new HashSet<>();
 
 	private static ApiHelpInventory apiHelpInventory = new ApiHelpInventory();
@@ -83,22 +76,26 @@ public class ApiHelpInventory {
 
 	}
 
-	public String getRootHelpJson(){
+	public String getResourceSwaggerJson(){
 		
-		SwaggerSerializers.setPrettyPrint(true);
-		Swagger swagger = new Swagger();			
-		ReaderConfig readerConfig = new ReaderConfig() {
-			
-			@Override
-			public boolean isScanAllResources() {
-				return true;
-			}
-			
-			@Override
-			public Collection<String> getIgnoredRoutes() {
-				return null;
-			}
-		};
+		SwaggerSerializers.setPrettyPrint(true);				
+		ReaderConfig readerConfig = new PlayReaderConfig();
+		
+		Swagger swagger = new Swagger();
+		PlaySwaggerConfig config = PlayConfigFactory.getConfig();
+		
+		swagger.setHost(config.getHost());
+		swagger.setBasePath(config.getBasePath());
+		
+		Info info = new Info();
+		info.setVersion(config.getVersion());
+		info.setTitle(config.getTitle());
+		info.setContact(new Contact().name(config.getContact()));
+		info.setLicense(new License().name(config.getLicense()).url(config.getLicenseUrl()));
+		info.setDescription(config.getDescription());
+		info.setTermsOfService(config.getTermsOfServiceUrl());
+				
+		swagger.setInfo(info);
 		
 		PlayReader reader = new PlayReader(swagger, readerConfig);
 		swagger = reader.read(controllerClasses);
@@ -108,8 +105,7 @@ public class ApiHelpInventory {
 		try {
 			return commonMapper.writeValueAsString(swagger);
 		} catch (JsonProcessingException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			Logger.error(e.getMessage());			
 			return "";
 		}
 	}
@@ -127,26 +123,36 @@ public class ApiHelpInventory {
 
 
 	private boolean isRessource(Class<?> javaClass) {
+		
 		// ignore interfaces and abstract classes
 		if (javaClass.isInterface()
-				|| Modifier.isAbstract(javaClass.getModifiers()))
+				|| Modifier.isAbstract(javaClass.getModifiers())){
 			return false;
+		}
+			
 
 		// check for @Path or @Provider annotation
-		if (hasAnnotation(javaClass, Path.class))
+		if (hasAnnotation(javaClass, Path.class)){
 			return true;
+		}
+			
 
 		return false;
 	}
 
 	private boolean hasAnnotation(Class<?> type, Class<? extends Annotation> annotation) {
+		
 		// null cannot have annotations
-		if (type == null)
+		if (type == null) {
 			return false;
+		}
+			
 
 		// class annotation
-		if (type.isAnnotationPresent(annotation))
+		if (type.isAnnotationPresent(annotation)) {
 			return true;
+		}
+			
 
 		// annotation on interface
 		for (Class<?> interfaceType : type.getInterfaces()) {
