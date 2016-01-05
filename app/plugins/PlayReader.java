@@ -133,12 +133,14 @@ public class PlayReader extends Reader {
 
     private Swagger read(Class<?> cls, String parentPath, String parentMethod, boolean readHidden, String[] parentConsumes, String[] parentProduces, Map<String, Tag> parentTags, List<Parameter> parentParameters, Set<Class<?>> scannedResources) {
     	
+    	RouteWrapper routes = RouteFactory.getRoute();
+    	
         Api api = (Api) cls.getAnnotation(Api.class);
         Map<String, SecurityScope> globalScopes = new HashMap<String, SecurityScope>();
 
         Map<String, Tag> tags = new HashMap<String, Tag>();
         List<SecurityRequirement> securities = new ArrayList<SecurityRequirement>();
-
+        
         String[] consumes = new String[0];
         String[] produces = new String[0];
         final Set<Scheme> globalSchemes = EnumSet.noneOf(Scheme.class);
@@ -207,10 +209,18 @@ public class PlayReader extends Reader {
             final javax.ws.rs.Path apiPath = ReflectionUtils.getAnnotation(cls, javax.ws.rs.Path.class);
             Method methods[] = cls.getMethods();
             for (Method method : methods) {
+            	
                 if (ReflectionUtils.isOverriddenMethod(method, cls)) {
                     continue;
                 }
                 javax.ws.rs.Path methodPath = ReflectionUtils.getAnnotation(method, javax.ws.rs.Path.class);
+                
+                // complete name as stored in route
+				String fullMethodName = getFullMethodName(cls, method);
+
+				if (!routes.exists(fullMethodName)) {
+					continue;
+				}
 
                 String operationPath = getPath(apiPath, methodPath, parentPath);
                 Map<String, String> regexMap = new HashMap<String, String>();
@@ -347,7 +357,16 @@ public class PlayReader extends Reader {
             }
         }
     }
+    
+    public String getFullMethodName(Class clazz, Method method) {
 
+    	String fullName = clazz.getCanonicalName() + "." + method.getName();				
+    	if(fullName.contains("controllers.")){
+    		fullName = fullName.replace("controllers.", "");
+    	}
+    	return fullName;
+    }
+    
     protected Parameter readImplicitParam(ApiImplicitParam param) {
         final Parameter p;
         if (param.paramType().equalsIgnoreCase("path")) {

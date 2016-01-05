@@ -58,8 +58,17 @@ public class SwaggerPlugin  extends PlayPlugin {
 
 		final Set<Class<?>> resourceClasses = 
 				ApiHelpInventory.getInstance().getRootResources();		
-		
+				
 		if (resourceClasses.size() > 0) {
+			
+	         Map<String, Route> router = new HashMap<>();
+	            
+	         for(Route route : Router.routes){ 	
+	         	router.put(route.action, route);
+	         }
+	         
+	         RouteWrapper routeWrapper = new RouteWrapper(router);
+	         RouteFactory.setRoute(routeWrapper);
 			
 			PlaySwaggerConfig playSwaggerConfig = new PlaySwaggerConfig();			
 			PlayConfigFactory.setConfig(playSwaggerConfig);
