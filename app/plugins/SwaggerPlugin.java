@@ -21,7 +21,7 @@ import java.util.Set;
  * 
  */
 public class SwaggerPlugin  extends PlayPlugin {
-	
+
 	private static final String APPLICATION_JSON = "application/json";
 	private static final String UTF_8 = "UTF-8";
 	private static final String RESOURCES_JSON = "/resources.json";
@@ -29,24 +29,30 @@ public class SwaggerPlugin  extends PlayPlugin {
 	@Override
 	public boolean rawInvocation(Request request, Response response) throws Exception {
 
-		Logger.debug("Got request for " + request.path);
+		if (request.path.equals(RESOURCES_JSON)) {
 
-		try {
-			final Set<Class<?>> resourceClasses = 
-					ApiHelpInventory.getInstance().getRootResources();
+			Logger.debug("Got request for " + request.path);
 
-			if(resourceClasses.size() > 0){
+			try {
+				
+				final Set<Class<?>> resourceClasses = 
+						ApiHelpInventory.getInstance().getRootResources();
 
-				if (request.path.equals(RESOURCES_JSON)) {
+				if(resourceClasses.size() > 0){
+
 					response.contentType = APPLICATION_JSON;
 					String jaxRsResponseJson = ApiHelpInventory.getInstance().getResourceSwaggerJson();                    
 					response.out.write(jaxRsResponseJson.getBytes(UTF_8));
 					return true;
-				} 
+					
+				}
+
+			} catch (Exception e) {
+				
+				Logger.error(e, "Error in SwaggerPlugin");
+				
 			}
 
-		} catch (Exception e) {
-			Logger.error(e, "Error in SwaggerPlugin");
 		}
 
 		return false;
@@ -58,26 +64,25 @@ public class SwaggerPlugin  extends PlayPlugin {
 
 		final Set<Class<?>> resourceClasses = 
 				ApiHelpInventory.getInstance().getRootResources();		
-				
+
 		if (resourceClasses.size() > 0) {
-			
-	         Map<String, Route> router = new HashMap<>();
-	            
-	         for(Route route : Router.routes){ 	
-	         	router.put(route.action, route);
-	         }
-	         
-	         RouteWrapper routeWrapper = new RouteWrapper(router);
-	         RouteFactory.setRoute(routeWrapper);
-			
+
+			Map<String, Route> router = new HashMap<>();
+
+			for(Route route : Router.routes){ 	
+				router.put(route.action, route);
+			}
+
+			RouteWrapper routeWrapper = new RouteWrapper(router);
+			RouteFactory.setRoute(routeWrapper);
+
 			PlaySwaggerConfig playSwaggerConfig = new PlaySwaggerConfig();			
 			PlayConfigFactory.setConfig(playSwaggerConfig);
-			
+
 			Router.prependRoute("GET", RESOURCES_JSON, "ApiHelpController.catchAll");
 			Logger.info("Swagger: Added ROOT help api @ " + RESOURCES_JSON);
 		}
 	}
-
 
 	@Override
 	public void afterApplicationStart() {

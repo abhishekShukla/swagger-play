@@ -85,7 +85,7 @@ public class ApiHelpInventory {
 		PlaySwaggerConfig config = PlayConfigFactory.getConfig();
 		
 		swagger.setHost(config.getHost());
-		swagger.setBasePath(config.getBasePath());
+		swagger.setBasePath(config.getBasePath());		
 		
 		Info info = new Info();
 		info.setVersion(config.getVersion());
