@@ -1,7 +1,5 @@
 package plugins;
 
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiImplicitParams;
@@ -10,8 +8,6 @@ import io.swagger.annotations.ApiResponse;
 import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.AuthorizationScope;
-import io.swagger.annotations.Extension;
-import io.swagger.annotations.ExtensionProperty;
 import io.swagger.annotations.Info;
 import io.swagger.annotations.ResponseHeader;
 import io.swagger.annotations.SwaggerDefinition;
@@ -20,10 +16,9 @@ import io.swagger.jaxrs.PATCH;
 import io.swagger.jaxrs.Reader;
 import io.swagger.jaxrs.config.DefaultReaderConfig;
 import io.swagger.jaxrs.config.ReaderConfig;
-import io.swagger.jaxrs.config.ReaderListener;
 import io.swagger.jaxrs.ext.SwaggerExtension;
 import io.swagger.jaxrs.ext.SwaggerExtensions;
-import io.swagger.jaxrs.utils.*;
+import io.swagger.jaxrs.utils.ReaderUtils;
 import io.swagger.models.Contact;
 import io.swagger.models.ExternalDocs;
 import io.swagger.models.License;
@@ -48,14 +43,9 @@ import io.swagger.models.properties.RefProperty;
 import io.swagger.util.BaseReaderUtils;
 import io.swagger.util.ParameterProcessor;
 import io.swagger.util.PathUtils;
+import io.swagger.util.PrimitiveType;
 import io.swagger.util.ReflectionUtils;
-import play.Logger;
 
-import org.apache.commons.lang3.StringUtils;
-
-import javax.ws.rs.Consumes;
-import javax.ws.rs.HttpMethod;
-import javax.ws.rs.Produces;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -71,6 +61,18 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.Produces;
+
+import org.apache.commons.lang3.StringUtils;
+
+import play.Logger;
+import play.Play;
+
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.type.TypeFactory;
 
 public class PlayReader extends Reader {
 
@@ -383,7 +385,9 @@ public class PlayReader extends Reader {
             Logger.warn("Unkown implicit parameter type: [" + param.paramType() + "]");
             return null;
         }
-        final Type type = ReflectionUtils.typeFromString(param.dataType());
+        
+        Type type = typeFromString(param.dataType());
+        
         return ParameterProcessor.applyAnnotations(swagger, p, type == null ? String.class : type,
                 Arrays.<Annotation>asList(param));
     }
@@ -968,5 +972,18 @@ public class PlayReader extends Reader {
         }
 
         protected abstract Property doWrap(Property property);
+    }
+
+    private Type typeFromString(String type) {
+        final PrimitiveType primitive = PrimitiveType.fromName(type);
+        if (primitive != null) {
+            return primitive.getKeyClass();
+        }
+        try {
+            return Play.classloader.loadClass(type);
+        } catch (Exception e) {
+            Logger.error(String.format("Failed to resolve '%s' into class", type), e);
+        }
+        return null;
     }
 }
